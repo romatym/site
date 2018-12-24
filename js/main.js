@@ -3,9 +3,10 @@
 //const uploadNew = document.getElementsByClassName('menu__item mode new')[0];
 const uploadError = document.querySelector('.error');
 const img = document.querySelector('.current-image');
-//const href = location.href.replace('file:///', '');
-//const href = location.href;
+
 const url = new URL(location.href);
+//const url = new URL('https://romatym.github.io/site?url=https://www.googleapis.com/download/storage/v1/b/neto-api.appspot.com/o/pic%2F91345230-0789-11e9-a1da-0b12842f971c%2F1.jpg?generation=1545662304148271&alt=media');
+
 img.addEventListener('load', () => {
     img.addEventListener('click', imgClick);
     canvas.addEventListener('click', imgClick);    
@@ -13,7 +14,6 @@ img.addEventListener('load', () => {
     initDraw();
 })
 const imageLoader = document.getElementsByClassName('image-loader')[0];
-
 
 var imageId;
 var state; //0 = new = initial, 1 = share, 2 = comments, 3 = draw
@@ -38,6 +38,12 @@ buttonBurger.addEventListener('click', event => {
     updateMenu('default');
 });
 
+if(window.location.search.slice(0, 5) === '?url=') {
+    img.src = window.location.search.slice(5);
+    state = 1;
+    //updateMenu('comments');
+}
+
 function DOMContentLoaded(event) {
 
     document.querySelector('.comments-tools').addEventListener('click', event => {
@@ -52,6 +58,8 @@ function DOMContentLoaded(event) {
     const loadedImage = window.sessionStorage.getItem("loadedImage");
     if (loadedImage !== null) {
         getImg(loadedImage);
+    } else  if(state === 1) {
+        updateMenu('comments');
     } else {
         updateMenu('new');
     }
@@ -647,7 +655,7 @@ function onLoadImage() {
 
         //initDraw();
 
-        document.querySelector('.menu__url').value = url.href + '\?url=' +  response.url;
+        document.querySelector('.menu__url').value = location.origin + location.pathname + '\?url=' +  response.url;
         commentForm === undefined;
         updateComments(response);
         updateMenu('share');
@@ -661,7 +669,7 @@ function onSaveImage() {
         const response = JSON.parse(this.responseText);
         img.src = response.url;
         imageId = response.id;
-        document.querySelector('.menu__url').value = url.href + '\?url=' +  response.url;
+        document.querySelector('.menu__url').value = location.origin + location.pathname + '\?url=' +  response.url;
 
         window.sessionStorage.setItem('loadedImage', response.id);
     }
