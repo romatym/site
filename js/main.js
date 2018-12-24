@@ -1,5 +1,7 @@
 'use strict';
 
+console.log('111');
+
 //const uploadNew = document.getElementsByClassName('menu__item mode new')[0];
 const uploadError = document.querySelector('.error');
 const img = document.querySelector('.current-image');
