@@ -38,6 +38,10 @@ buttonBurger.addEventListener('click', event => {
     updateMenu('default');
 });
 
+console.log(window.location.search);
+console.log(window.location.search.slice(0, 5));
+console.log(window.location.search.slice(5));
+
 if(window.location.search.slice(0, 5) === '?url=') {
     img.src = window.location.search.slice(5);
     state = 1;
