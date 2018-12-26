@@ -1,6 +1,11 @@
 'use strict';
 
 //console.log('111');
+console.log('window.location.href ' + document.location.href);
+console.log('document.URL ' + document.URL);
+console.log('document.location.search ' + document.location.search);
+console.log('document.location.search.slice(0, 5) ' + document.location.search.slice(0, 5));
+console.log('document.location.search.slice(5) ' + document.location.search.slice(5));
 
 //const uploadNew = document.getElementsByClassName('menu__item mode new')[0];
 const uploadError = document.querySelector('.error');
@@ -44,9 +49,6 @@ buttonBurger.addEventListener('click', event => {
     updateMenu('default');
 });
 
-console.log('document.location.search ' + document.location.search);
-console.log('document.location.search.slice(0, 5) ' + document.location.search.slice(0, 5));
-console.log('document.location.search.slice(5) ' + document.location.search.slice(5));
 
 if (window.location.search.slice(0, 5) === '?url=') {
     mainImage.src = window.location.search.slice(5);
