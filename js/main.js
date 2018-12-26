@@ -1,20 +1,24 @@
 'use strict';
 
-console.log('111');
+//console.log('111');
 
 //const uploadNew = document.getElementsByClassName('menu__item mode new')[0];
 const uploadError = document.querySelector('.error');
-const img = document.querySelector('.current-image');
+const mainImage = document.querySelector('.current-image');
 
 const url = new URL(location.href);
 //const url = new URL('https://romatym.github.io/site?url=https://www.googleapis.com/download/storage/v1/b/neto-api.appspot.com/o/pic%2F91345230-0789-11e9-a1da-0b12842f971c%2F1.jpg?generation=1545662304148271&alt=media');
 
-img.addEventListener('load', () => {
-    img.addEventListener('click', imgClick);
-    canvas.addEventListener('click', imgClick);    
+mainImage.addEventListener('load', () => {
+    mainImage.addEventListener('click', imgClick);
+    canvas.addEventListener('click', imgClick);
 
-    initDraw();
-})
+    mainImage.addEventListener('dblclick', test);
+    //initDraw();
+});
+function test() {
+    updateMenu('default');
+}
 const imageLoader = document.getElementsByClassName('image-loader')[0];
 
 var imageId;
@@ -40,12 +44,12 @@ buttonBurger.addEventListener('click', event => {
     updateMenu('default');
 });
 
-console.log(window.location.search);
-console.log(window.location.search.slice(0, 5));
-console.log(window.location.search.slice(5));
+console.log('document.location.search ' + document.location.search);
+console.log('document.location.search.slice(0, 5) ' + document.location.search.slice(0, 5));
+console.log('document.location.search.slice(5) ' + document.location.search.slice(5));
 
-if(window.location.search.slice(0, 5) === '?url=') {
-    img.src = window.location.search.slice(5);
+if (window.location.search.slice(0, 5) === '?url=') {
+    mainImage.src = window.location.search.slice(5);
     state = 1;
     //updateMenu('comments');
 }
@@ -64,7 +68,7 @@ function DOMContentLoaded(event) {
     const loadedImage = window.sessionStorage.getItem("loadedImage");
     if (loadedImage !== null) {
         getImg(loadedImage);
-    } else  if(state === 1) {
+    } else if (state === 1) {
         updateMenu('comments');
     } else {
         updateMenu('new');
@@ -73,20 +77,28 @@ function DOMContentLoaded(event) {
 
 /////////////////обмен web-socket///////////////////////////////////
 
-var connection;
+var webSocketConnection;
 
 function initWebSocket() {
-    connection = new WebSocket('wss://neto-api.herokuapp.com/pic/' + imageId);
+    webSocketConnection = new WebSocket('wss://neto-api.herokuapp.com/pic/' + imageId);
 
-    connection.addEventListener('message', webSocketGetMessage);
-    connection.addEventListener('error', onerror);
+    webSocketConnection.addEventListener('message', webSocketGetMessage);
+    webSocketConnection.addEventListener('error', onerror);
 }
+
 function sendCanvas() {
-    var data = canvas.toDataURL('image/png');
-    try {
-        connection.send(data);
-    } catch (err) {
-        console.log(err);
+    if (paintChanged) {
+        var blob = dataURItoBlob(canvas.toDataURL('image/png'));
+        try {
+            webSocketConnection.send(blob);
+        } catch (err) {
+            console.log(err);
+        }
+    }
+}
+function webSocketConnectionClose() {
+    if(webSocketConnection !== undefined) {
+        webSocketConnection.close();
     }
 }
 function throttle(callback, delay) {
@@ -101,26 +113,73 @@ function throttle(callback, delay) {
         }
     }
 }
-function webSocketGetMessage(event) {    
+
+function webSocketGetMessage(event) {
     if (event.data !== undefined) {
-
-    } else {
-
+        const eventData = JSON.parse(event.data);
+        if (eventData.event === 'mask') {
+            clearCanvas();
+            loadMask(eventData.url);
+        } else if (eventData.event === 'pic') {
+            if(eventData.pic.mask !== undefined) {
+                loadMask(eventData.pic.mask);
+            }
+        } else if (eventData.event === 'comment') {
+            setComment(eventData.message, eventData.timestamp, eventData.left, eventData.top);
+        }
+        else if (eventData.event === 'error') {
+            console.log(eventData.error);
+        }
     }
 }
+
+function loadMask(maskUrl) {
+    //clearCanvas();
+    paintChanged = false;
+    var canvasImg = new Image();    
+    canvasImg.addEventListener('load', () => {
+        oldCtx.drawImage(canvasImg, 0, 0);
+    });
+    canvasImg.src = maskUrl;
+}
+function dataURItoBlob(dataURI) {
+    var byteString;
+    if (dataURI.split(',')[0].indexOf('base64') >= 0)
+        byteString = atob(dataURI.split(',')[1]);
+    else
+        byteString = unescape(dataURI.split(',')[1]);
+
+    var mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+
+    var ia = new Uint8Array(byteString.length);
+    for (var i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+    }
+
+    return new Blob([ia], {
+        type: mimeString
+    });
+}
+
 function onerror(event) {
     console.log(event.message);
 }
 ////////////////////////////рисовать ///////////////////////////////////////////
 var canvas = document.querySelector(".new_canvas");
 var ctx = canvas.getContext("2d");
+
+var oldCanvas = document.querySelector(".old_canvas");
+var oldCtx = oldCanvas.getContext("2d");
+
 var __opacity = 1;
-var paint = false;
+//var paint = false;
+var paintChanged = false;
 var paintColor = '#6cbe47'; //green
 
 for (const btnColor of document.querySelectorAll('.menu__color')) {
     btnColor.addEventListener('click', setColor);
 }
+
 function setColor(event) {
 
     if (event.target.value === 'red') {
@@ -135,13 +194,21 @@ function setColor(event) {
         paintColor = '#b36ade';
     }
 }
+
 function resizeCanvas() {
-    canvas.style.top = (img.offsetTop - img.height / 2) + 'px';
-    canvas.style.left = (img.offsetLeft - img.width / 2) + 'px';
-    canvas.width = img.width;
-    canvas.height = img.height;
+    canvas.style.top = (mainImage.offsetTop - mainImage.height / 2) + 'px';
+    canvas.style.left = (mainImage.offsetLeft - mainImage.width / 2) + 'px';
+    canvas.width = mainImage.width;
+    canvas.height = mainImage.height;
     canvas.style.position = "absolute"; //position: relative;
+
+    oldCanvas.style.top = (mainImage.offsetTop - mainImage.height / 2) + 'px';
+    oldCanvas.style.left = (mainImage.offsetLeft - mainImage.width / 2) + 'px';
+    oldCanvas.width = mainImage.width;
+    oldCanvas.height = mainImage.height;
+    oldCanvas.style.position = "absolute"; //position: relative;
 }
+
 function initDraw() {
 
     resizeCanvas();
@@ -155,32 +222,36 @@ function initDraw() {
     // На любое движение мыши по canvas будет выполнятся эта функция
     canvas.addEventListener('mousemove', drawIfPressed);
     canvas.addEventListener('mousemove', throttle(() => {
-        if (event.buttons === 1) {
+        if (paintChanged) {
             sendCanvas();
         }
     }, 2000));
 
     initWebSocket();
 }
-// function clearCanvas() {            
-//     ctx.clearRect(0, 0, canvas.width, canvas.height);
-// }
+
+function clearCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
 
 function drawIfPressed(e) {
-    if (!paint) {
+    if (state !== 'draw') {
         return;
     }
 
-    var x = e.offsetX;
-    var y = e.offsetY;
-    var dx = e.movementX;
-    var dy = e.movementY;
-
     if (e.buttons === 1) {
+
+        paintChanged = true;
+
+        var x = e.offsetX;
+        var y = e.offsetY;
+        var dx = e.movementX;
+        var dy = e.movementY;
+
         ctx.beginPath();
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
-        ctx.lineWidth = 4;        
+        ctx.lineWidth = 4;
         ctx.strokeStyle = paintColor;
         ctx.moveTo(x, y);
         ctx.lineTo(x - dx, y - dy);
@@ -213,8 +284,8 @@ function imgClick(event) {
         newCommentForm.getElementsByClassName('comments__marker-checkbox')[0].checked = true;
     }
     //if (event.target !== newCommentForm) {        
-        newCommentForm.style.left = event.pageX - 20 + 'px';
-        newCommentForm.style.top = event.pageY + 'px';
+    newCommentForm.style.left = event.pageX - 20 + 'px';
+    newCommentForm.style.top = event.pageY + 'px';
     //}
     newCommentForm.addEventListener('click', event => {
         event.stopPropagation();
@@ -279,6 +350,7 @@ function timeConverter(UNIX_timestamp) {
     var time = date + ' ' + month + ' ' + year + ' ' + hour + ':' + min + ':' + sec;
     return time;
 }
+
 function setComment(message, timestamp, left, top) {
 
     const commentsContainer = document.getElementsByTagName('body')[0];
@@ -489,7 +561,7 @@ const menuDrag = document.querySelector('.menu__item.drag');
 menuDrag.addEventListener('mousedown', startDrag);
 
 function startDrag(event) {
-    if(!event.target.classList.contains('drag')) {
+    if (!event.target.classList.contains('drag')) {
         return;
     }
     let newCoordX, newCoordY;
@@ -499,19 +571,20 @@ function startDrag(event) {
     document.body.appendChild(menu);
 
     menu.style.zIndex = 15;
-    
+
     function moveAt(event) {
         newCoordX = event.pageX - menuDrag.clientWidth / 2;
         newCoordY = event.pageY - menuDrag.clientHeight / 2;
-        if(newCoordX > 0 
-            && newCoordY > 0 
-            && newCoordX < (wrap.clientWidth - menu.clientWidth) 
-            && newCoordY < (wrap.clientHeight - menu.clientHeight)) {
+        if (newCoordX > 0 &&
+            newCoordY > 0 &&
+            newCoordX < (wrap.clientWidth - menu.clientWidth) &&
+            newCoordY < (wrap.clientHeight - menu.clientHeight)) {
             menu.style.left = newCoordX + 'px';
             menu.style.top = newCoordY + 'px';
         }
-    }    
-    function removeSub()  {
+    }
+
+    function removeSub() {
         document.removeEventListener('mousemove', moveAt);
         menuDrag.removeEventListener('mouseup', removeSub);
     }
@@ -520,7 +593,7 @@ function startDrag(event) {
 
 }
 //menuDrag.ondragstart = function() {
-    //return false;
+//return false;
 //};
 
 function updateMenu(newState) {
@@ -547,14 +620,16 @@ function updateMenu(newState) {
         changeVisible(item, item.classList.contains(state) || item.classList.contains(state + '-tools') || newState === 'default');
     }
 
-    paint = false;
+    //paint = false;
     deleteNewCommentForm();
-
+    initDraw();
+    
     if (state === 'share') {
         buttonShare.dataset.state = 'selected';
     } else if (state === 'draw') {
         buttonDraw.dataset.state = 'selected';
-        paint = true;
+        
+        //paint = true;
     } else if (state === 'comments') {
         buttonComments.dataset.state = 'selected';
     } else if (state === 'new') {
@@ -578,6 +653,7 @@ inputFile.type = 'file';
 inputFile.addEventListener('change', onSelectFilesInput);
 
 document.addEventListener('DOMContentLoaded', DOMContentLoaded);
+//document.addEventListener('load', DOMContentLoaded);
 
 const wrap = document.getElementsByClassName('wrap app')[0];
 wrap.addEventListener('drop', onFilesDrop);
@@ -606,7 +682,7 @@ function onSelectFilesInput(event) {
 
 function showImageLoader() {
     uploadError.setAttribute('style', 'display: none;');
-    img.src = '';
+    mainImage.src = '';
     imageLoader.removeAttribute('style', 'display: none;');
 }
 
@@ -619,7 +695,7 @@ function setImage(files) {
 
             saveImg(file.name, file);
 
-            img.addEventListener('load', event => {
+            mainImage.addEventListener('load', event => {
                 //window.URL.revokeObjectURL(event.target.src);
                 imageLoader.setAttribute('style', 'display: none;');
                 updateMenu('share');
@@ -656,14 +732,17 @@ function saveImg(title, image) {
 function onLoadImage() {
     if (this.status === 200) {
         const response = JSON.parse(this.responseText);
-        img.src = response.url;
+        mainImage.src = response.url;
         imageId = response.id;
 
-        //initDraw();
+        initDraw();
+        if(response.mask !== undefined) {
+            //loadMask(response.mask);
+        }
 
-        document.querySelector('.menu__url').value = location.origin + location.pathname + '\?url=' +  response.url;
+        document.querySelector('.menu__url').value = location.origin + location.pathname + '\?url=' + response.url;
         commentForm === undefined;
-        updateComments(response);
+        updateComments(response.comments);
         updateMenu('share');
     } else {
         updateMenu('new');
@@ -673,9 +752,9 @@ function onLoadImage() {
 function onSaveImage() {
     if (this.status === 200) {
         const response = JSON.parse(this.responseText);
-        img.src = response.url;
+        mainImage.src = response.url;
         imageId = response.id;
-        document.querySelector('.menu__url').value = location.origin + location.pathname + '\?url=' +  response.url;
+        document.querySelector('.menu__url').value = location.origin + location.pathname + '\?url=' + response.url;
 
         window.sessionStorage.setItem('loadedImage', response.id);
     }
@@ -702,12 +781,12 @@ function onSaveComment() {
         const response = JSON.parse(this.responseText);
         removeLoader();
         commentForm = undefined;
-        updateComments(response);
+        updateComments(response.comments);
     }
 }
 
-function updateComments(response) {
-    if (response.comments === undefined) {
+function updateComments(comments) {
+    if (comments === undefined) {
         return;
     }
 
@@ -717,8 +796,8 @@ function updateComments(response) {
     });
 
 
-    for (const comment of Object.keys(response.comments)) {
-        const objComment = response.comments[comment];
+    for (const comment of Object.keys(comments)) {
+        const objComment = comments[comment];
         setComment(objComment.message, objComment.timestamp, objComment.left, objComment.top);
     }
 }
